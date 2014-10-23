@@ -276,28 +276,68 @@ describe("Image container and window scroll:", function() {
         el.remove();
     });
 
-    // TODO: this case doesn't work in IE8, due to window scroll event isn't properly fired
-    it('Does lazy image work with window', function() {
-        var el = angular.element('<div afkl-lazy-image="img/foo.png 480w"></div>');
-        var p = angular.element('<p></p>');
-        var body = $document[0].body;
-        //dir($window);
 
-        angular.element(body).append(p);
-        angular.element(body).append(el);
-        var height = $window.innerHeight || $window.document.documentElement.clientHeight;
-        p[0].style.height = height + 100 + 'px';
+    it('Does lazy image work with custom image container2', function() {
+        var el = angular.element('<div afkl-image-container class="dd"><p></p><div><span afkl-lazy-image="img/foo.png 480w"></span></div></div>');
+
+        angular.element($document[0].body).append(el);
+        var div = el.find('span'),
+            p = el.find('p');
+        el[0].style.height = '200px';
+        el[0].style.overflowY = 'scroll';
+        p[0].style.height = '800px';
         $compile(el)(scope);
         scope.$digest();
 
-        expect(el.html()).toBe('');
+        expect(div.html()).toBe('');
 
-        $window.scrollTo ? $window.scrollTo(0, height) : document.documentElement.scrollTo(0, height);
-        scrollEvent($window);
+        el[0].scrollTop = 200;
+        scrollEvent(el[0]);
         scope.$digest();
 
-        expect(el.html()).toBe('<img alt="" class="afkl-lazy-image" src="img/foo.png">');
+        expect(div.html()).toBe('');
+
+        el[0].scrollTop = 400;
+        scrollEvent(el[0]);
+        scope.$digest();
+
+        expect(div.html()).toBe('');
+
+        el[0].scrollTop = 600;
+        scrollEvent(el[0]);
+        scope.$digest();
+
+        expect(div.html()).toBe('<img alt="" class="afkl-lazy-image" src="img/foo.png">');
+
+        el.remove();
     });
+
+    var ua = navigator.userAgent;
+    if (ua.indexOf('PhantomJS') === -1 && ua.indexOf('MSIE 8.0') === -1) {
+        // TODO: this case doesn't work in IE8, coz window scroll event isn't properly fired.
+        // TODO: this case doesn't work in PhantomJS, coz window size will grow infinitely to fit its contents.
+        it('Does lazy image work with window (Expected in IE8 & PhantomsJS)', function() {
+            var el = angular.element('<div afkl-lazy-image="img/foo.png 480w"></div>');
+            var p = angular.element('<p></p>');
+            var body = $document[0].body;
+            //dir($window);
+
+            angular.element(body).append(p);
+            angular.element(body).append(el);
+            var height = $window.innerHeight || $window.document.documentElement.clientHeight;
+            p[0].style.height = height + 500 + 'px';
+            $compile(el)(scope);
+            scope.$digest();
+
+            expect(el.html()).toBe('');
+
+            $window.scrollTo ? $window.scrollTo(0, height) : document.documentElement.scrollTo(0, height);
+            scrollEvent($window);
+            scope.$digest();
+
+            expect(el.html()).toBe('<img alt="" class="afkl-lazy-image" src="img/foo.png">');
+        });
+    }
 });
 
 // TODO: TRIGGER RESIZE EVENT

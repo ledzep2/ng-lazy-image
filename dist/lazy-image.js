@@ -308,6 +308,8 @@ angular.module('afkl.lazyImage', [])
     .directive('afklLazyImage', ['$window', '$timeout', 'afklSrcSetService', function ($window, $timeout, srcSetService) {
         'use strict';
 
+        $window = angular.element($window);
+
         // Use srcSetService to find out our best available image
         var bestImage = function (images) {
             var image = srcSetService.get({srcset: images});
@@ -339,29 +341,35 @@ angular.module('afkl.lazyImage', [])
                 var offset = options.offset ? options.offset : 50; // default offset
                 var LOADING = 'afkl-lazy-image-loading';
 
-                // Begin with offset and update on resize
-                var _elementOffset = function () {
-                    if (element.offset) {
-                        return element.offset().top;
+                // Offset of $e to window, if $e is window, will return the scrollTop of window;
+                var _offset = function ($e) {
+                    $e = $e || element;
+                    if ($e[0] === $window[0]) {
+                        return _scrollTop($window);
                     }
-                    var box = element[0].getBoundingClientRect();
-                    return box.top + _containerScrollTop() - document.documentElement.clientTop;
+                    if ($e.offset) {
+                        return $e.offset().top;
+                    }
+                    var box = $e[0].getBoundingClientRect();
+                    return box.top + _scrollTop($window) - document.documentElement.clientTop;
                 };
 
-                var _elementPosition = function (el) {
-                    var e = el || element;
-                    if (e.position) {
-                        return e.position().top;
-                    }
-                    return (el || !e.parent()[0]) ? e[0].offsetTop : e[0].offsetTop - _elementPosition(e.parent());
+                // Relative offset to $c
+                var _position = function ($e, $c) {
+                    $e = $e || element;
+                    $c = $c || $container;
+                    var offset = _offset($e),
+                        offset2 = _offset($c);
+
+                    return offset - offset2 + _scrollTop($c);
                 };
 
-                var _containerScrollTop = function () {
-                    if ($container.scrollTop) {
-                        return $container.scrollTop();
+                var _scrollTop = function ($e) {
+                    if ($e.scrollTop) {
+                        return $e.scrollTop();
                     }
 
-                    var c = $container[0];
+                    var c = $e[0];
                     if (c.pageYOffset !== undefined) {
                         return c.pageYOffset;
                     }
@@ -372,12 +380,12 @@ angular.module('afkl.lazyImage', [])
                     return document.documentElement.scrollTop || 0;
                 };
 
-                var _containerInnerHeight = function () {
-                    if ($container.innerHeight) {
-                        return $container.innerHeight();
+                var _innerHeight = function ($e) {
+                    if ($e.innerHeight) {
+                        return $e.innerHeight();
                     }
 
-                    var c = $container[0];
+                    var c = $e[0];
                     if (c.innerHeight !== undefined) {
                         return c.innerHeight;
                     } else if (c.clientHeight !== undefined) {
@@ -385,6 +393,25 @@ angular.module('afkl.lazyImage', [])
                     }
 
                     return document.documentElement.clientHeight || 0;
+                };
+
+                var _inView = function ($e, $view) {
+                    var remaining, windowBottom;
+
+                    /*var scroll = "scrollY" in $window[0] ? 
+                        $window[0].scrollY 
+                        : document.documentElement.scrollTop;*/
+                    // https://developer.mozilla.org/en-US/docs/Web/API/window.scrollY
+                    var scroll = _scrollTop($view);
+                    var height = _innerHeight($view);
+                    var elOffset = _position($e, $view);
+
+                    windowBottom = height + scroll;
+                    remaining = elOffset - windowBottom;
+
+                    // Is our top of our image container in bottom of our viewport?
+                    //console.log($container[0].className, _elementOffset(), _elementPosition(), height, scroll, remaining, elOffset);
+                    return remaining <= offset;
                 };
 
                 // Update url of our image
@@ -446,25 +473,7 @@ angular.module('afkl.lazyImage', [])
 
                 // EVENT: SCROLL. Check if our container is for first time in our view or not
                 var _onScroll = function () {
-                    // Config vars
-                    var remaining, shouldLoad, windowBottom;
-
-                    var height = _containerInnerHeight();
-
-                    /*var scroll = "scrollY" in $window[0] ? 
-                        $window[0].scrollY 
-                        : document.documentElement.scrollTop;*/
-                    // https://developer.mozilla.org/en-US/docs/Web/API/window.scrollY
-                    var scroll = _containerScrollTop();
-                    var elOffset = $container[0] === $window ? _elementOffset() : _elementPosition();
-
-                    windowBottom = height + scroll;
-                    remaining = elOffset - windowBottom;
-
-                    // Is our top of our image container in bottom of our viewport?
-                    //console.log($container[0].className, _elementOffset(), _elementPosition(), height, scroll, remaining, elOffset);
-                    shouldLoad = remaining <= offset;
-
+                    var shouldLoad = _inView(element, $container) && _inView($container, $window);
                     // Append image first time when it comes into our view, after that only resizing can have influence
                     if (shouldLoad && !loaded) {
 
@@ -527,8 +536,7 @@ angular.module('afkl.lazyImage', [])
                     return _eventsOff();
                 });
 
-                return _onScroll();
-
+                _onScroll();
             }
         };
 
