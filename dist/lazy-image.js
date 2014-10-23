@@ -300,9 +300,9 @@ angular.module('afkl.lazyImage', [])
         return {
             restrict: 'A',
             // We have to use controller instead of link here so that it will always run earlier than nested afklLazyImage directives
-            controller: function ($scope, $element) {
+            controller: ['$scope', '$element', function ($scope, $element) {
                 $element.data('afklImageContainer', $element);
-            }
+            }]
         };
     })
     .directive('afklLazyImage', ['$window', '$timeout', 'afklSrcSetService', function ($window, $timeout, srcSetService) {
